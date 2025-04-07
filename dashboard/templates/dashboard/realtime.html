@@ -1,0 +1,365 @@
+{% extends 'base.html' %}
+
+{% block title %}Потокове відео | Система розпізнавання об'єктів{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-md-3">
+            <div class="card shadow mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Навігація</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="nav flex-column">
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'dashboard:index' %}">
+                                <i class="bi bi-house-door"></i> Головна
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link active" href="{% url 'dashboard:realtime' %}">
+                                <i class="bi bi-camera-video"></i> Потокове відео
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'upload_handler:upload' %}">
+                                <i class="bi bi-upload"></i> Завантажити фото/відео
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'dashboard:history' %}">
+                                <i class="bi bi-clock-history"></i> Історія розпізнавань
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="card shadow mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Налаштування потоку</h5>
+                </div>
+                <div class="card-body">
+                    <form id="streamSettingsForm">
+                        <div class="mb-3">
+                            <label for="streamUrl" class="form-label">URL потоку (RTSP/RTMP)</label>
+                            <input type="text" class="form-control" id="streamUrl" placeholder="rtsp://example.com/stream">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="streamSource" class="form-label">Джерело відео</label>
+                            <select class="form-select" id="streamSource">
+                                <option value="rtsp">RTSP потік</option>
+                                <option value="webcam">Веб-камера</option>
+                                <option value="file">Відеофайл</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3" id="webcamSelectDiv" style="display: none;">
+                            <label for="webcamSelect" class="form-label">Веб-камера</label>
+                            <select class="form-select" id="webcamSelect">
+                                <option value="0">Камера 1</option>
+                                <option value="1">Камера 2</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3" id="videoFileDiv" style="display: none;">
+                            <label for="videoFile" class="form-label">Відеофайл</label>
+                            <input type="file" class="form-control" id="videoFile" accept="video/*">
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="enableDetection" checked>
+                                <label class="form-check-label" for="enableDetection">Увімкнути розпізнавання</label>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <button type="button" id="startStream" class="btn btn-success">
+                                <i class="bi bi-play-fill"></i> Старт
+                            </button>
+                            <button type="button" id="stopStream" class="btn btn-danger" disabled>
+                                <i class="bi bi-stop-fill"></i> Стоп
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Статистика</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Статус:</label>
+                        <div class="alert alert-secondary" id="streamStatus">Очікування</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Виявлено об'єктів:</label>
+                        <div class="alert alert-info" id="detectionCount">0</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Час роботи:</label>
+                        <div class="alert alert-info" id="streamTime">00:00:00</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-9">
+            <div class="card shadow mb-4">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Потокове відео</h5>
+                    <div>
+                        <button type="button" id="captureScreenshot" class="btn btn-light btn-sm" disabled>
+                            <i class="bi bi-camera"></i> Знімок
+                        </button>
+                        <button type="button" id="toggleFullscreen" class="btn btn-light btn-sm">
+                            <i class="bi bi-fullscreen"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div id="videoContainer" class="text-center">
+                        <img id="videoStream" src="/static/img/waiting-stream.jpg" class="img-fluid" alt="Відеопотік">
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Розпізнані об'єкти</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Тип об'єкта</th>
+                                    <th>Впевненість</th>
+                                    <th>Час виявлення</th>
+                                    <th>Дії</th>
+                                </tr>
+                            </thead>
+                            <tbody id="detectionList">
+                                <tr>
+                                    <td colspan="4" class="text-center">Немає розпізнаних об'єктів</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // WebSocket для підключення до відеопотоку
+    let socket = null;
+    let streamStartTime = null;
+    let timerInterval = null;
+    let detectionCounter = 0;
+
+    // Обробники кнопок
+    document.getElementById('streamSource').addEventListener('change', function() {
+        const source = this.value;
+
+        // Показати/сховати відповідні елементи
+        document.getElementById('webcamSelectDiv').style.display = source === 'webcam' ? 'block' : 'none';
+        document.getElementById('videoFileDiv').style.display = source === 'file' ? 'block' : 'none';
+
+        const streamUrlDiv = document.querySelector('.mb-3:first-child');
+        streamUrlDiv.style.display = source === 'rtsp' ? 'block' : 'none';
+    });
+
+    document.getElementById('startStream').addEventListener('click', function() {
+        // Вимкнути кнопку старту
+        this.disabled = true;
+        document.getElementById('stopStream').disabled = false;
+        document.getElementById('captureScreenshot').disabled = false;
+
+        // Змінити статус
+        document.getElementById('streamStatus').textContent = 'Підключення...';
+        document.getElementById('streamStatus').className = 'alert alert-warning';
+
+        // Запустити таймер
+        streamStartTime = new Date();
+        timerInterval = setInterval(updateTimer, 1000);
+
+        // Підключитися до WebSocket
+        connectToWebSocket();
+    });
+
+    document.getElementById('stopStream').addEventListener('click', function() {
+        // Вимкнути кнопку стопу
+        this.disabled = true;
+        document.getElementById('startStream').disabled = false;
+        document.getElementById('captureScreenshot').disabled = true;
+
+        // Змінити статус
+        document.getElementById('streamStatus').textContent = 'Зупинено';
+        document.getElementById('streamStatus').className = 'alert alert-secondary';
+
+        // Зупинити таймер
+        clearInterval(timerInterval);
+
+        // Закрити WebSocket
+        if (socket) {
+            socket.close();
+            socket = null;
+        }
+
+        // Скинути зображення
+        document.getElementById('videoStream').src = '/static/img/waiting-stream.jpg';
+    });
+
+    // Підключення до WebSocket
+    function connectToWebSocket() {
+        // Створити WebSocket з'єднання
+        const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+        const wsUrl = protocol + window.location.host + '/ws/stream/';
+
+        socket = new WebSocket(wsUrl);
+
+        socket.onopen = function(e) {
+            console.log('WebSocket connected');
+
+            // Відправити налаштування потоку
+            const streamSettings = {
+                'type': document.getElementById('streamSource').value,
+                'url': document.getElementById('streamUrl').value,
+                'webcam_id': document.getElementById('webcamSelect').value,
+                'enable_detection': document.getElementById('enableDetection').checked
+            };
+
+            socket.send(JSON.stringify({
+                'command': 'start_stream',
+                'settings': streamSettings
+            }));
+
+            document.getElementById('streamStatus').textContent = 'Підключено';
+            document.getElementById('streamStatus').className = 'alert alert-success';
+        };
+
+        socket.onmessage = function(e) {
+            const data = JSON.parse(e.data);
+
+            if (data.type === 'frame') {
+                // Оновити зображення
+                document.getElementById('videoStream').src = 'data:image/jpeg;base64,' + data.frame;
+            } else if (data.type === 'detection') {
+                // Додати розпізнаний об'єкт до таблиці
+                addDetectionToTable(data.detection);
+
+                // Оновити лічильник
+                detectionCounter++;
+                document.getElementById('detectionCount').textContent = detectionCounter;
+            } else if (data.type === 'error') {
+                // Показати помилку
+                alert('Помилка: ' + data.message);
+                document.getElementById('streamStatus').textContent = 'Помилка';
+                document.getElementById('streamStatus').className = 'alert alert-danger';
+            }
+        };
+
+        socket.onclose = function(e) {
+            console.log('WebSocket disconnected');
+
+            if (document.getElementById('stopStream').disabled === false) {
+                // Якщо з'єднання закрито не користувачем
+                document.getElementById('streamStatus').textContent = 'Від\'єднано';
+                document.getElementById('streamStatus').className = 'alert alert-danger';
+
+                document.getElementById('stopStream').disabled = true;
+                document.getElementById('startStream').disabled = false;
+            }
+        };
+
+        socket.onerror = function(e) {
+            console.error('WebSocket error:', e);
+            document.getElementById('streamStatus').textContent = 'Помилка з\'єднання';
+            document.getElementById('streamStatus').className = 'alert alert-danger';
+        };
+    }
+
+    // Додати розпізнаний об'єкт до таблиці
+    function addDetectionToTable(detection) {
+        const tbody = document.getElementById('detectionList');
+
+        // Перевірити, чи є повідомлення про відсутність об'єктів
+        if (tbody.querySelector('tr td[colspan="4"]')) {
+            tbody.innerHTML = '';
+        }
+
+        // Створити новий рядок
+        const row = document.createElement('tr');
+
+        // Додати інформацію
+        row.innerHTML = `
+            <td>${detection.object_type}</td>
+            <td>${(detection.confidence * 100).toFixed(2)}%</td>
+            <td>${new Date().toLocaleTimeString()}</td>
+            <td>
+                <button class="btn btn-sm btn-primary view-detection">
+                    <i class="bi bi-eye"></i>
+                </button>
+                <button class="btn btn-sm btn-success save-detection">
+                    <i class="bi bi-download"></i>
+                </button>
+            </td>
+        `;
+
+        // Додати рядок на початок таблиці
+        tbody.insertBefore(row, tbody.firstChild);
+
+        // Обмежити кількість рядків
+        if (tbody.children.length > 10) {
+            tbody.removeChild(tbody.lastChild);
+        }
+    }
+
+    // Оновити таймер
+    function updateTimer() {
+        if (!streamStartTime) return;
+
+        const now = new Date();
+        const diff = now - streamStartTime;
+
+        const hours = Math.floor(diff / 3600000).toString().padStart(2, '0');
+        const minutes = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
+        const seconds = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
+
+        document.getElementById('streamTime').textContent = `${hours}:${minutes}:${seconds}`;
+    }
+
+    // Повноекранний режим
+    document.getElementById('toggleFullscreen').addEventListener('click', function() {
+        const videoContainer = document.getElementById('videoContainer');
+
+        if (!document.fullscreenElement) {
+            videoContainer.requestFullscreen().catch(err => {
+                alert(`Помилка переходу в повноекранний режим: ${err.message}`);
+            });
+        } else {
+            document.exitFullscreen();
+        }
+    });
+
+    // Зробити знімок
+    document.getElementById('captureScreenshot').addEventListener('click', function() {
+        if (socket) {
+            socket.send(JSON.stringify({
+                'command': 'capture_screenshot'
+            }));
+        }
+    });
+</script>
+{% endblock %}

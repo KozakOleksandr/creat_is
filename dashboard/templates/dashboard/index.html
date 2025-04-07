@@ -1,0 +1,211 @@
+{% extends 'base.html' %}
+
+{% block title %}Головна | Система розпізнавання об'єктів{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-md-3">
+            <div class="card shadow mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Навігація</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="nav flex-column">
+                        <li class="nav-item">
+                            <a class="nav-link active" href="{% url 'dashboard:index' %}">
+                                <i class="bi bi-house-door"></i> Головна
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'dashboard:realtime' %}">
+                                <i class="bi bi-camera-video"></i> Потокове відео
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'upload_handler:upload' %}">
+                                <i class="bi bi-upload"></i> Завантажити фото/відео
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'dashboard:history' %}">
+                                <i class="bi bi-clock-history"></i> Історія розпізнавань
+                            </a>
+                        </li>
+                        {% if user.is_staff %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'dashboard:settings' %}">
+                                <i class="bi bi-gear"></i> Налаштування
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'accounts:register' %}">
+                                <i class="bi bi-person-plus"></i> Реєстрація користувачів
+                            </a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-9">
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="card shadow mb-4">
+                        <div class="card-header bg-success text-white">
+                            <h5 class="mb-0">Всього розпізнавань</h5>
+                        </div>
+                        <div class="card-body">
+                            <h1 class="display-4 text-center">{{ detection_count }}</h1>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-4">
+                    <div class="card shadow mb-4">
+                        <div class="card-header bg-info text-white">
+                            <h5 class="mb-0">Всього сесій</h5>
+                        </div>
+                        <div class="card-body">
+                            <h1 class="display-4 text-center">{{ session_count }}</h1>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-4">
+                    <div class="card shadow mb-4">
+                        <div class="card-header bg-warning text-dark">
+                            <h5 class="mb-0">Типів об'єктів</h5>
+                        </div>
+                        <div class="card-body">
+                            <h1 class="display-4 text-center">{{ object_types|length }}</h1>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="card shadow mb-4">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0">Статистика розпізнавань за останній тиждень</h5>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="detectionChart" width="400" height="200"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card shadow mb-4">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0">Останні розпізнавання</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if recent_detections %}
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Тип</th>
+                                            <th>Впевненість</th>
+                                            <th>Час</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for detection in recent_detections %}
+                                        <tr>
+                                            <td>{{ detection.object_type }}</td>
+                                            <td>{{ detection.confidence|floatformat:2 }}%</td>
+                                            <td>{{ detection.detection_time|date:"d.m.Y H:i" }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <p class="text-center">Немає даних про розпізнавання.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="card shadow mb-4">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0">Статистика по типах об'єктів</h5>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="objectTypeChart" width="400" height="300"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Завантаження статистики
+    fetch('{% url "dashboard:detection_stats" %}')
+        .then(response => response.json())
+        .then(data => {
+            // Графік за днями
+            const dailyCtx = document.getElementById('detectionChart').getContext('2d');
+            const dailyChart = new Chart(dailyCtx, {
+                type: 'line',
+                data: {
+                    labels: data.daily_stats.map(item => item.date),
+                    datasets: [{
+                        label: 'Кількість розпізнавань',
+                        data: data.daily_stats.map(item => item.count),
+                        backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    },
+                    responsive: true
+                }
+            });
+
+            // Графік по типах об'єктів
+            const objectCtx = document.getElementById('objectTypeChart').getContext('2d');
+            const objectChart = new Chart(objectCtx, {
+                type: 'pie',
+                data: {
+                    labels: data.object_stats.map(item => item.type),
+                    datasets: [{
+                        data: data.object_stats.map(item => item.count),
+                        backgroundColor: [
+                            'rgba(255, 99, 132, 0.6)',
+                            'rgba(54, 162, 235, 0.6)',
+                            'rgba(255, 206, 86, 0.6)',
+                            'rgba(75, 192, 192, 0.6)',
+                            'rgba(153, 102, 255, 0.6)',
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                        }
+                    }
+                }
+            });
+        });
+</script>
+{% endblock %}
