@@ -255,39 +255,80 @@ pip install channels_redis
 ## Структура проєкту
 
 ```
-drone_detection/
+project_root/
 │
-├── accounts/                    # Додаток для управління користувачами
-│   ├── models.py                # Моделі користувачів та ролей
-│   ├── views.py                 # Представлення авторизації
-│   └── templates/               # Шаблони авторизації
+├── manage.py
+├── requirements.txt
+├── README.md
 │
-├── stream_handler/              # Додаток для роботи з відеопотоком
-│   ├── video_stream.py          # Класи для роботи з різними джерелами відео
-│   ├── consumers.py             # WebSocket consumers
-│   └── routing.py               # Маршрутизація WebSocket
+├── drone_vision/                  # Основний пакет проєкту
+│   ├── __init__.py
+│   ├── settings.py
+│   ├── urls.py
+│   ├── asgi.py
+│   └── wsgi.py
 │
-├── upload_handler/              # Додаток для завантаження файлів
-│   ├── models.py                # Моделі для зберігання медіафайлів
-│   └── views.py                 # Представлення для завантаження та обробки
+├── accounts/                      # Додаток для автентифікації
+│   ├── __init__.py
+│   ├── admin.py
+│   ├── apps.py
+│   ├── models.py                  # Моделі користувачів та ролей
+│   ├── views.py                   # Логіка автентифікації
+│   ├── urls.py
+│   ├── forms.py                   # Форми реєстрації/входу
+│   └── templates/
+│       └── accounts/
+│           ├── login.html
+│           └── register.html
 │
-├── detector/                    # Додаток для розпізнавання об'єктів
-│   ├── models/                  # Директорія для моделей YOLO
-│   ├── utils.py                 # Утиліти для роботи з моделями
-│   ├── detector.py              # Класи розпізнавання об'єктів
-│   └── training.py              # Скрипти для дотренування моделей
+├── dashboard/                     # Додаток для інтерфейсу користувача
+│   ├── __init__.py
+│   ├── admin.py
+│   ├── apps.py
+│   ├── models.py
+│   ├── views.py                   # Логіка веб-інтерфейсу
+│   ├── urls.py
+│   └── templates/
+│       └── dashboard/
+│           ├── index.html         # Головна сторінка
+│           ├── realtime.html      # Інтерфейс реального часу
+│           └── history.html       # Історія розпізнавань
 │
-├── dashboard/                   # Додаток для веб-інтерфейсу
-│   ├── views.py                 # Основні представлення
-│   └── templates/               # Шаблони інтерфейсу
+├── detector/                      # Додаток для розпізнавання об'єктів
+│   ├── __init__.py
+│   ├── admin.py
+│   ├── apps.py
+│   ├── models.py                  # Моделі для зберігання результатів
+│   ├── detector.py                # Основна логіка розпізнавання
+│   ├── yolo_model.py              # Обгортка для YOLO
+│   └── utils.py                   # Допоміжні функції
 │
-├── static/                      # Статичні файли (CSS, JS, зображення)
+├── stream_handler/                # Обробка відеопотоку
+│   ├── __init__.py
+│   ├── admin.py
+│   ├── apps.py
+│   ├── models.py                  # Моделі для налаштувань потоку
+│   ├── consumers.py               # WebSocket consumer для потоку
+│   ├── stream_processor.py        # Обробка відеопотоку
+│   └── routing.py                 # Маршрутизація WebSocket
 │
-├── templates/                   # Загальні шаблони
+├── upload_handler/                # Обробка завантажених файлів
+│   ├── __init__.py
+│   ├── admin.py
+│   ├── apps.py
+│   ├── models.py                  # Моделі для завантажених файлів
+│   ├── views.py                   # Логіка завантаження та обробки
+│   ├── forms.py                   # Форми для завантаження
+│   └── tasks.py                   # Фонові завдання для обробки
 │
-├── manage.py                    # Скрипт управління Django
-├── requirements.txt             # Залежності проєкту
-└── README.md                    # Документація проєкту
+├── static/                        # Статичні файли
+│   ├── css/
+│   ├── js/
+│   └── img/
+│
+└── media/                         # Директорія для завантажених файлів
+    ├── uploads/                   # Завантажені медіафайли
+    └── results/                   # Результати розпізнавання
 ```
 
 ## Додаткові рекомендації
